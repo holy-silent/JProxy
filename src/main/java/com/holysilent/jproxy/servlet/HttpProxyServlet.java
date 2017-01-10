@@ -1,6 +1,7 @@
 package com.holysilent.jproxy.servlet;
 
 import com.holysilent.jproxy.constant.Constants;
+import com.holysilent.jproxy.utils.PropertiesUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -34,19 +35,14 @@ import java.util.Properties;
  */
 public class HttpProxyServlet extends HttpServlet{
     private String targetURL;
+    private String cookieExclude;
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
     @Override
     public void init(ServletConfig config) throws ServletException {
-        try {
-            Properties p = new Properties();
-            InputStream in = getClass().getClassLoader().getResourceAsStream(Constants.INIT_FILE);
-            p.load(in);
-            this.targetURL = p.getProperty(Constants.TARGET_APP_BASE_URL) == null ? "" : p.getProperty(Constants.TARGET_APP_BASE_URL);
-            logger.info("param {} : {}", new Object[]{Constants.TARGET_APP_BASE_URL, this.targetURL});
-        }catch (IOException e) {
-            e.printStackTrace();
-        }
+        this.targetURL = PropertiesUtils.get(Constants.TARGET_APP_BASE_URL) == null ? "" : PropertiesUtils.get(Constants.TARGET_APP_BASE_URL);
+        this.cookieExclude = PropertiesUtils.get("cookie-exclude")==null?"" : PropertiesUtils.get("cookie-exclude");
+        logger.info("param {} : {}", new Object[]{Constants.TARGET_APP_BASE_URL, this.targetURL});
     }
 
     @Override
@@ -62,7 +58,7 @@ public class HttpProxyServlet extends HttpServlet{
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         if (StringUtils.isBlank(this.targetURL)) {
             resp.setStatus(404);
-            resp.getWriter().write("<h1>sorry, marathon ui configured error.</h1>");
+            resp.getWriter().write("<h1>sorry, target url was configured error.</h1>");
             resp.getWriter().flush();
             resp.getWriter().close();
             return;
@@ -154,7 +150,7 @@ public class HttpProxyServlet extends HttpServlet{
         Header[] headers = httpResponse.getHeaders("Set-Cookie");
         if(headers.length > 0) {
             for(Header header: headers) {
-                if(header.getName().trim().toLowerCase().equals("X-Frame-Options")) {
+                if (this.cookieExclude.contains(header.getName().trim().toLowerCase())) {
                     continue;
                 }
                 String[] cookies = header.getValue().split(";");
